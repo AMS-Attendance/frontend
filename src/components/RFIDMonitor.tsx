@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
+import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
 
@@ -26,9 +27,7 @@ export default function RFIDMonitor() {
 
   useEffect(() => {
     // Check authentication
-    const token = localStorage.getItem('token');
-    
-    if (!token || !user) {
+    if (!user) {
       navigate('/login', { replace: true });
       return;
     }
@@ -86,8 +85,12 @@ export default function RFIDMonitor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    try{
+      await axios.post(`${import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api'}/auth/logout`, {}, { withCredentials: true });
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
     localStorage.removeItem('user');
     navigate('/login');
   };

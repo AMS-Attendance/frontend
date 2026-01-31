@@ -6,7 +6,7 @@ import RFIDMonitor from './components/RFIDMonitor'
 import LecturerRegistration from './components/LecturerRegistration'
 import LecturerDashboard from './components/LecturerDashboard'
 import StudentDashboard from './components/StudentDashboard'
-import { ModulesPage, LecturesPage, AttendancePage, ModuleDetailPage } from './pages'
+import { ModulesPage, AttendancePage, ModuleDetailPage } from './pages'
 
 function App() {
   return (
@@ -25,9 +25,6 @@ function App() {
           {/* Module Routes */}
           <Route path="/modules" element={<ModulesPage />} />
           <Route path="/modules/:id" element={<ModuleDetailPage />} />
-          
-          {/* Lecture Routes */}
-          <Route path="/lectures" element={<LecturesPage />} />
           
           {/* Attendance Routes */}
           <Route path="/attendance" element={<AttendancePage />} />

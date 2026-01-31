@@ -3,6 +3,7 @@ import { Route, BrowserRouter as Router, Routes, Navigate } from 'react-router-d
 import { AuthProvider } from './context'
 import Login from './components/Login'
 import RFIDMonitor from './components/RFIDMonitor'
+import RFIDRegistration from './components/RFIDRegistration'
 import LecturerRegistration from './components/LecturerRegistration'
 import LecturerDashboard from './components/LecturerDashboard'
 import StudentDashboard from './components/StudentDashboard'
@@ -32,6 +33,7 @@ function App() {
           {/* Attendance Routes */}
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/rfid-monitor" element={<RFIDMonitor />} />
+          <Route path="/admin/student-registration" element={<RFIDRegistration />} />
           
           <Route path="*" element={<div className="text-center mt-20 text-3xl font-bold">404 - Page Not Found</div>} />
         </Routes>

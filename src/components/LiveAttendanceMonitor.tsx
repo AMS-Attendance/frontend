@@ -4,7 +4,7 @@ import axios from 'axios';
 import { X, Wifi, UserCheck, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api';
 const SOCKET_URL = 'http://localhost:8000'; // Adjust if different from API_URL
 
 interface LiveAttendanceMonitorProps {
@@ -30,6 +30,8 @@ const LiveAttendanceMonitor: FC<LiveAttendanceMonitorProps> = ({ lectureId, lect
     const [logs, setLogs] = useState<string[]>([]);
     const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [sessionActive, setSessionActive] = useState(false);
+    const [sessionError, setSessionError] = useState('');
 
     // Initial fetch of existing attendance
     useEffect(() => {
@@ -40,7 +42,7 @@ const LiveAttendanceMonitor: FC<LiveAttendanceMonitorProps> = ({ lectureId, lect
     const fetchAttendance = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_URL}/api/attendance/lecture/${lectureId}`, {
+            const response = await axios.get(`${API_URL}/attendance/lecture/${lectureId}`, {
                 withCredentials: true
             });
 
@@ -68,6 +70,42 @@ const LiveAttendanceMonitor: FC<LiveAttendanceMonitorProps> = ({ lectureId, lect
         setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${message}`, ...prev].slice(0, 50));
     };
 
+    const startSession = async () => {
+        try {
+            setSessionError('');
+            await axios.post(`${API_URL}/attendance/session/start`, { lectureId }, { withCredentials: true });
+            setSessionActive(true);
+            addLog('Session started');
+        } catch (error: any) {
+            const msg = error.response?.data?.message || 'Failed to start session';
+            setSessionError(msg);
+            setSessionActive(false);
+            addLog(msg);
+        }
+    };
+
+    const endSession = async (withLog = true) => {
+        try {
+            await axios.post(`${API_URL}/attendance/session/end`, {}, { withCredentials: true });
+            if (withLog) addLog('Session ended');
+        } catch (error: any) {
+            if (withLog) {
+                const msg = error.response?.data?.message || 'Failed to end session';
+                addLog(msg);
+            }
+        } finally {
+            setSessionActive(false);
+        }
+    };
+
+    useEffect(() => {
+        startSession();
+        return () => {
+            void endSession(false);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lectureId]);
+
     useEffect(() => {
         const newSocket = io(SOCKET_URL, {
             transports: ['websocket'],
@@ -88,22 +126,9 @@ const LiveAttendanceMonitor: FC<LiveAttendanceMonitorProps> = ({ lectureId, lect
         });
 
         // Listen for GLOBAL RFID scans (from ESP32)
-        newSocket.on('rfid:batch', async (data: { rfids: string[] }) => {
+        newSocket.on('rfid:batch', (data: { rfids: string[]; lectureId?: string | null }) => {
+            if (data.lectureId && data.lectureId !== lectureId) return;
             addLog(`Received batch of ${data.rfids.length} RFIDs`);
-
-            // Process each RFID
-            for (const rfid of data.rfids) {
-                try {
-                    await axios.post(`${API_URL}/api/attendance/rfid`, {
-                        lectureId,
-                        rfid
-                    }, { withCredentials: true });
-                } catch (error: any) {
-                    console.log(error)
-                    const msg = error.response?.data?.message || "Failed to mark";
-                    addLog(`Error processing RFID ${rfid}: ${msg}`);
-                }
-            }
         });
 
         // Listen for attendance updates (successful marks)
@@ -140,10 +165,29 @@ const LiveAttendanceMonitor: FC<LiveAttendanceMonitorProps> = ({ lectureId, lect
                         <p className="text-sm text-slate-500">
                             {connected ? 'Listening for RFID scans...' : 'Connecting to server...'}
                         </p>
+                        {sessionError && (
+                            <p className="text-xs text-red-600 mt-1">{sessionError}</p>
+                        )}
                     </div>
-                    <Button variant="ghost" size="icon" onClick={onClose}>
-                        <X className="w-5 h-5" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant={sessionActive ? 'destructive' : 'secondary'}
+                            onClick={() => endSession()}
+                            disabled={!sessionActive}
+                        >
+                            {sessionActive ? 'End Session' : 'Session Ended'}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                void endSession(false);
+                                onClose();
+                            }}
+                        >
+                            <X className="w-5 h-5" />
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-3">

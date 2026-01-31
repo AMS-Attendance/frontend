@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FC, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_BASE_URL;
 
 axios.defaults.withCredentials = true;
 
-export default function Login() {
+const Login: FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,11 +31,11 @@ export default function Login() {
 
       // Redirect based on role
       if (response.data.user.role === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin');
       } else if (response.data.user.role === 'lecturer') {
-        navigate('/lecturer/dashboard');
+        navigate('/lecturer-dashboard');
       } else {
-        navigate('/student/dashboard');
+        navigate('/student-dashboard');
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -152,3 +152,5 @@ export default function Login() {
     </div>
   );
 }
+
+export default Login;

@@ -1,62 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import  { useState,  type FC } from 'react';
 import axios from 'axios';
+import { Button } from '@/components/ui/button';
 
 const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api';
 
-interface Module {
-  _id: string;
-  code: string;
-  name: string;
-}
 
-const LecturerRegistration: React.FC = () => {
+const LecturerRegistration: FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
-  const [modules, setModules] = useState<Module[]>([]);
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    fetchModules();
-  }, []);
-
-  const fetchModules = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/modules`, {
-        withCredentials: true
-      });
-      setModules(response.data.data || []);
-    } catch (err: unknown) {
-      console.error('Error fetching modules:', err);
-    }
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
   };
 
-  const handleModuleToggle = (moduleId: string) => {
-    setSelectedModules(prev => 
-      prev.includes(moduleId) 
-        ? prev.filter(id => id !== moduleId)
-        : [...prev, moduleId]
-    );
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-
+    console.log('Submitting form data:', formData); 
     // Validation
     if (!formData.name || !formData.email || !formData.password) {
       setError('Please fill all required fields');
@@ -89,21 +62,7 @@ const LecturerRegistration: React.FC = () => {
         }
       );
 
-      // If modules were selected, update lecturer with modules
-      if (selectedModules.length > 0) {
-        const lecturerId = response.data.data._id;
-        await Promise.all(
-          selectedModules.map(moduleId =>
-            axios.put(
-              `${API_URL}/modules/${moduleId}`,
-              { lecturerId },
-              {
-                withCredentials: true
-              }
-            )
-          )
-        );
-      }
+
 
       setSuccess('Lecturer registered successfully!');
       setFormData({
@@ -112,10 +71,7 @@ const LecturerRegistration: React.FC = () => {
         password: '',
         confirmPassword: ''
       });
-      setSelectedModules([]);
       
-      // Refresh modules list
-      fetchModules();
     } catch (err: unknown) {
       console.error('Registration error:', err);
       const axiosError = err as { 
@@ -272,7 +228,7 @@ const LecturerRegistration: React.FC = () => {
           </div>
 
           {/* Modules */}
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Assign Modules (Optional)
             </label>
@@ -281,11 +237,11 @@ const LecturerRegistration: React.FC = () => {
                 <p className="text-gray-500 text-sm">No modules available</p>
               ) : (
                 modules.map(module => (
-                  <label key={module._id} className="flex items-center space-x-3 py-2 hover:bg-gray-50 rounded cursor-pointer">
+                  <label key={module.id} className="flex items-center space-x-3 py-2 hover:bg-gray-50 rounded cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedModules.includes(module._id)}
-                      onChange={() => handleModuleToggle(module._id)}
+                      checked={selectedModules.includes(module.id)}
+                      onChange={() => handleModuleToggle(module.id)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <span className="text-sm text-gray-700">
@@ -300,18 +256,18 @@ const LecturerRegistration: React.FC = () => {
                 {selectedModules.length} module(s) selected
               </p>
             )}
-          </div>
+          </div> */}
 
           {/* Submit Button */}
           <div className="flex gap-4">
-            <button
+            <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+              className="  font-medium"
             >
               {loading ? 'Registering...' : 'Register Lecturer'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => {
                 setFormData({
@@ -320,14 +276,13 @@ const LecturerRegistration: React.FC = () => {
                   password: '',
                   confirmPassword: ''
                 });
-                setSelectedModules([]);
                 setError('');
                 setSuccess('');
               }}
-              className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+              className=" rounded-lg   transition-colors font-medium"
             >
               Clear
-            </button>
+            </Button>
           </div>
         </form>
       </div>

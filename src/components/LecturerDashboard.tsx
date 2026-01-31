@@ -1,77 +1,96 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import StudentPicker from './StudentPicker';
+import { useState, useEffect, type FC } from "react";
+import axios from "axios";
+import StudentPicker from "./StudentPicker";
+import { Calendar, MapPin, SquarePen, Trash2, UsersRound, BookmarkCheck, Trash, Loader, Plus } from "lucide-react";
+import LiveAttendanceMonitor from "./LiveAttendanceMonitor";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
-const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8000/api";
 
 interface Module {
-  _id: string;
+  id: string;
   code: string;
   name: string;
   credits: number;
   semester: string;
-  studentList: Student[];
+  students: Student[];
 }
 
 interface Lecture {
-  _id: string;
-  moduleId: Module;
-  startTime: string;
-  endTime: string;
-  location: string;
-  type: string;
+  id: string;
+  moduleId: string;
+  module?: Module;
+  title: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  duration: number;
+  location?: string;
   description?: string;
-  isCompleted: boolean;
-  isCancelled: boolean;
+  status?: "SCHEDULED" | "COMPLETED" | "CANCELLED" | "OTHER";
+  type?: "LECTURE" | "LAB" | "TUTORIAL" | "OTHER";
 }
 
 interface Student {
-  _id: string;
+  id: string;
   name: string;
   email: string;
-  indexNumber: string;
-  batch: string;
+  index_number: string;
+  batch: number;
   degree: string;
 }
 
-const LecturerDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'lectures' | 'modules' | 'students'>('lectures');
+const LecturerDashboard: FC = () => {
+  const [activeTab, setActiveTab] = useState<
+    "lectures" | "modules" | "students"
+  >("lectures");
   const [modules, setModules] = useState<Module[]>([]);
   const [lectures, setLectures] = useState<Lecture[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
-  
+
   // Filters
-  const [selectedModule, setSelectedModule] = useState<string>('');
-  const [selectedBatch, setSelectedBatch] = useState<string>('');
+  const [selectedModule, setSelectedModule] = useState<string>("");
+  const [selectedBatch, setSelectedBatch] = useState<string>("");
   const [batches, setBatches] = useState<string[]>([]);
 
   // Lecture Form
   const [showLectureForm, setShowLectureForm] = useState(false);
   const [editingLecture, setEditingLecture] = useState<Lecture | null>(null);
   const [lectureForm, setLectureForm] = useState({
-    moduleId: '',
-    startTime: '',
-    endTime: '',
-    location: '',
-    type: 'Lecture',
-    description: ''
+    moduleId: "",
+    title: "",
+    scheduledDate: "",
+    scheduledTime: "",
+    duration: 2,
+    location: "",
+    description: "",
+    type: "LECTURE",
+    status: "SCHEDULED"
   });
 
   // Module Form
   const [showModuleForm, setShowModuleForm] = useState(false);
   const [editingModule, setEditingModule] = useState<Module | null>(null);
   const [moduleForm, setModuleForm] = useState({
-    code: '',
-    name: '',
+    code: "",
+    name: "",
     credits: 3,
-    semester: '1',
-    description: ''
+    semester: "1",
+    description: "",
   });
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [selectedLiveLecture, setSelectedLiveLecture] = useState<{ id: string, title: string } | null>(null);
 
   useEffect(() => {
     fetchModules();
@@ -91,66 +110,99 @@ const LecturerDashboard: React.FC = () => {
   const fetchModules = async () => {
     try {
       const response = await axios.get(`${API_URL}/modules/my-modules`, {
-        withCredentials: true
+        withCredentials: true,
       });
       setModules(response.data.data || []);
     } catch (err: unknown) {
-      console.error('Error fetching modules:', err);
-      setError('Failed to load modules');
+      console.error("Error fetching modules:", err);
+      setError("Failed to load modules");
     }
   };
 
   const fetchLectures = async () => {
     try {
       const response = await axios.get(`${API_URL}/lectures`, {
-        withCredentials: true
+        withCredentials: true,
       });
-      setLectures(response.data.data || []);
+      console.log("Fetched lectures:", response.data.data);
+
+      // Map backend snake_case to frontend camelCase
+      const mappedLectures: Lecture[] = (response.data.data || []).map((l: any) => ({
+        id: l.id,
+        moduleId: l.module_id,
+        module: l.module,
+        title: l.title || "Untitled Lecture", // fallback
+        scheduledDate: l.scheduled_at ? l.scheduled_at.split('T')[0] : "",
+        scheduledTime: l.scheduled_at ? l.scheduled_at.split('T')[1].substring(0, 5) : "",
+        duration: l.duration_hours ? parseInt(l.duration_hours) : 2,
+        location: l.location,
+        description: l.description,
+        status: l.status,
+        type: l.type
+      }));
+
+      setLectures(mappedLectures);
     } catch (err: unknown) {
-      console.error('Error fetching lectures:', err);
+      console.error("Error fetching lectures:", err);
     }
   };
 
   const fetchStudentsByModule = async (moduleId: string) => {
     try {
       const response = await axios.get(`${API_URL}/modules/${moduleId}`, {
-        withCredentials: true
+        withCredentials: true,
       });
-      const studentList = response.data.data?.studentList || [];
+      const studentList = response.data.data?.students || [];
       setFilteredStudents(studentList);
-      
+
       // Extract unique batches
-      const uniqueBatches = [...new Set(studentList.map((s: Student) => s.batch))].filter(Boolean) as string[];
+      const uniqueBatches = [
+        ...new Set(studentList.map((s: Student) => s.batch)),
+      ]
+        .filter(Boolean)
+        .map(String);
       setBatches(uniqueBatches);
     } catch (err: unknown) {
-      console.error('Error fetching students:', err);
-      setError('Failed to load students');
+      console.error("Error fetching students:", err);
+      setError("Failed to load students");
     }
   };
 
   const fetchStudentsByBatch = async (batch: string) => {
     try {
-      const response = await axios.get(`${API_URL}/users/students?batch=${batch}`, {
-        withCredentials: true
-      });
+      const response = await axios.get(
+        `${API_URL}/users/students?batch=${batch}`,
+        {
+          withCredentials: true,
+        },
+      );
       setFilteredStudents(response.data.data || []);
     } catch (err: unknown) {
-      console.error('Error fetching students:', err);
-      setError('Failed to load students by batch');
+      console.error("Error fetching students:", err);
+      setError("Failed to load students by batch");
     }
   };
 
-  const handleLectureFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleLectureFormChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     setLectureForm({ ...lectureForm, [e.target.name]: e.target.value });
   };
 
   const handleCreateLecture = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
-    if (!lectureForm.moduleId || !lectureForm.startTime || !lectureForm.endTime || !lectureForm.location) {
-      setError('Please fill all required fields');
+    if (
+      !lectureForm.moduleId ||
+      !lectureForm.title ||
+      !lectureForm.scheduledDate ||
+      !lectureForm.scheduledTime || !lectureForm.type || !lectureForm.duration || !lectureForm.location || !lectureForm.status
+    ) {
+      setError("Please fill all required fields");
       return;
     }
 
@@ -160,44 +212,43 @@ const LecturerDashboard: React.FC = () => {
       if (editingLecture) {
         // Update existing lecture
         await axios.put(
-          `${API_URL}/lectures/${editingLecture._id}`,
+          `${API_URL}/lectures/${editingLecture.id}`,
           lectureForm,
           {
-            withCredentials: true
-          }
+            withCredentials: true,
+          },
         );
-        setSuccess('Lecture updated successfully!');
+        setSuccess("Lecture updated successfully!");
       } else {
         // Create new lecture
-        console.log('Creating lecture:', lectureForm);
-        await axios.post(
-          `${API_URL}/lectures`,
-          lectureForm,
-          {
-            withCredentials: true
-          }
-        );
-        setSuccess('Lecture created successfully!');
+        console.log("Creating lecture:", lectureForm);
+        await axios.post(`${API_URL}/lectures`, lectureForm, {
+          withCredentials: true,
+        });
+        setSuccess("Lecture created successfully!");
       }
 
       // Reset form
       setLectureForm({
-        moduleId: '',
-        startTime: '',
-        endTime: '',
-        location: '',
-        type: 'Lecture',
-        description: ''
+        moduleId: "",
+        title: "",
+        scheduledDate: "",
+        scheduledTime: "",
+        duration: 2,
+        location: "",
+        description: "",
+        type: "",
+        status: "SCHEDULED"
       });
       setShowLectureForm(false);
       setEditingLecture(null);
       fetchLectures();
     } catch (err: unknown) {
-      console.error('Error saving lecture:', err);
-      
+      console.error("Error saving lecture:", err);
+
       // Extract detailed error information
-      const axiosError = err as { 
-        response?: { 
+      const axiosError = err as {
+        response?: {
           data?: { message?: string; error?: string };
           status?: number;
           statusText?: string;
@@ -206,51 +257,65 @@ const LecturerDashboard: React.FC = () => {
         message?: string;
       };
 
-      let errorMessage = 'Failed to save lecture';
+      let errorMessage = "Failed to save lecture";
 
       if (axiosError.response) {
         // Server responded with error
         const status = axiosError.response.status;
         const data = axiosError.response.data;
-        
-        errorMessage = data?.message || data?.error || axiosError.response.statusText || errorMessage;
-        
-        console.error('Server error response:', {
+
+        errorMessage =
+          data?.message ||
+          data?.error ||
+          axiosError.response.statusText ||
+          errorMessage;
+
+        console.error("Server error response:", {
           status,
           statusText: axiosError.response.statusText,
-          data: axiosError.response.data
+          data: axiosError.response.data,
         });
 
         // Add specific error context
         if (status === 400) {
-          if (errorMessage.includes('Module not found') || errorMessage.includes('Invalid moduleId')) {
+          if (
+            errorMessage.includes("Module not found") ||
+            errorMessage.includes("Invalid moduleId")
+          ) {
             errorMessage = `Invalid module selected. ${errorMessage}`;
-          } else if (errorMessage.includes('End time must be after start time')) {
-            errorMessage = 'End time must be after start time. Please check your lecture schedule.';
-          } else if (errorMessage.includes('date format')) {
-            errorMessage = 'Invalid date/time format. Please select valid dates.';
-          } else if (errorMessage.includes('Invalid lecture type')) {
-            errorMessage = 'Invalid lecture type selected.';
-          } else if (errorMessage.includes('required fields')) {
-            errorMessage = 'Please fill all required fields: Module, Start Time, End Time, and Location.';
+          } else if (
+            errorMessage.includes("End time must be after start time")
+          ) {
+            errorMessage =
+              "End time must be after start time. Please check your lecture schedule.";
+          } else if (errorMessage.includes("date format")) {
+            errorMessage =
+              "Invalid date/time format. Please select valid dates.";
+          } else if (errorMessage.includes("Invalid lecture type")) {
+            errorMessage = "Invalid lecture type selected.";
+          } else if (errorMessage.includes("required fields")) {
+            errorMessage =
+              "Please fill all required fields: Module, Start Time, End Time, and Location.";
           }
         } else if (status === 401) {
-          errorMessage = 'Authentication failed. Please login again.';
+          errorMessage = "Authentication failed. Please login again.";
         } else if (status === 403) {
-          errorMessage = 'Access denied. You do not have permission to create/edit lectures for this module.';
+          errorMessage =
+            "Access denied. You do not have permission to create/edit lectures for this module.";
         } else if (status === 404) {
-          errorMessage = 'Module not found. Please select a valid module.';
+          errorMessage = "Module not found. Please select a valid module.";
         } else if (status === 500) {
           errorMessage = `Server error: ${errorMessage}. Please try again later.`;
         }
       } else if (axiosError.request) {
         // Request made but no response
-        errorMessage = 'No response from server. Please check your connection and try again.';
-        console.error('No response received:', axiosError.request);
+        errorMessage =
+          "No response from server. Please check your connection and try again.";
+        console.error("No response received:", axiosError.request);
       } else {
         // Error setting up request
         errorMessage = axiosError.message || errorMessage;
-        console.error('Request setup error:', axiosError.message);
+        console.error("Request setup error:", axiosError.message);
       }
 
       setError(errorMessage);
@@ -262,99 +327,118 @@ const LecturerDashboard: React.FC = () => {
   const handleEditLecture = (lecture: Lecture) => {
     setEditingLecture(lecture);
     setLectureForm({
-      moduleId: lecture.moduleId._id,
-      startTime: new Date(lecture.startTime).toISOString().slice(0, 16),
-      endTime: new Date(lecture.endTime).toISOString().slice(0, 16),
-      location: lecture.location,
-      type: lecture.type,
-      description: lecture.description || ''
+      moduleId: lecture.moduleId,
+      title: lecture.title,
+      scheduledDate: lecture.scheduledDate,
+      scheduledTime: lecture.scheduledTime,
+      duration: lecture.duration,
+      location: lecture.location || "",
+      description: lecture.description || "",
+      type: lecture.type || "LECTURE",
+      status: lecture.status || "SCHEDULED",
     });
     setShowLectureForm(true);
   };
 
   const handleDeleteLecture = async (lectureId: string) => {
-    if (!confirm('Are you sure you want to delete this lecture?')) return;
+    if (!confirm("Are you sure you want to delete this lecture?")) return;
 
     try {
       await axios.delete(`${API_URL}/lectures/${lectureId}`, {
-        withCredentials: true
+        withCredentials: true,
       });
-      setSuccess('Lecture deleted successfully!');
+      setSuccess("Lecture deleted successfully!");
       fetchLectures();
     } catch (err: unknown) {
-      console.error('Error deleting lecture:', err);
+      console.error("Error deleting lecture:", err);
       const axiosError = err as { response?: { data?: { message?: string } } };
-      const errorMessage = axiosError.response?.data?.message || 'Failed to delete lecture';
+      const errorMessage =
+        axiosError.response?.data?.message || "Failed to delete lecture";
       setError(errorMessage);
     }
   };
 
   // Module CRUD Functions
-  const handleModuleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleModuleFormChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value } = e.target;
-    setModuleForm({ ...moduleForm, [name]: name === 'credits' ? Number(value) : value });
+    setModuleForm({
+      ...moduleForm,
+      [name]: name === "credits" ? Number(value) : value,
+    });
   };
 
   const handleCreateModule = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     if (!moduleForm.code || !moduleForm.name) {
-      setError('Please fill all required fields');
+      setError("Please fill all required fields");
       return;
     }
 
     try {
       setLoading(true);
 
-      const payload = { 
-        ...moduleForm, 
-        studentList: selectedStudentIds 
+      const payload = {
+        ...moduleForm,
+        studentList: selectedStudentIds,
       };
 
       if (editingModule) {
         // Update existing module
-        console.log('Updating module:', { id: editingModule._id, payload });
+        console.log("Updating module:", { id: editingModule.id, payload });
         const response = await axios.put(
-          `${API_URL}/modules/${editingModule._id}`,
+          `${API_URL}/modules/${editingModule.id}`,
           payload,
-          { withCredentials: true }
+          { withCredentials: true },
         );
-        console.log('Module update response:', response.data);
-        setSuccess(`Module updated successfully! ${selectedStudentIds.length} students enrolled.`);
+        console.log("Module update response:", response.data);
+        setSuccess(
+          `Module updated successfully! ${selectedStudentIds.length} students enrolled.`,
+        );
       } else {
         // Create new module (lecturerId is automatically set by backend from auth token)
-        console.log('Creating module:', {
+        console.log("Creating module:", {
           code: payload.code,
           name: payload.name,
           credits: payload.credits,
           semester: payload.semester,
           studentCount: payload.studentList.length,
-          description: payload.description || '(none)'
+          description: payload.description || "(none)",
         });
-        
-        const response = await axios.post(
-          `${API_URL}/modules`,
-          payload,
-          { withCredentials: true }
+
+        const response = await axios.post(`${API_URL}/modules`, payload, {
+          withCredentials: true,
+        });
+
+        console.log("Module creation response:", response.data);
+        setSuccess(
+          `Module created successfully! ${selectedStudentIds.length} students enrolled.`,
         );
-        
-        console.log('Module creation response:', response.data);
-        setSuccess(`Module created successfully! ${selectedStudentIds.length} students enrolled.`);
       }
 
-      setModuleForm({ code: '', name: '', credits: 3, semester: '1', description: '' });
+      setModuleForm({
+        code: "",
+        name: "",
+        credits: 3,
+        semester: "1",
+        description: "",
+      });
       setSelectedStudentIds([]);
       setShowModuleForm(false);
       setEditingModule(null);
       fetchModules();
     } catch (err: unknown) {
-      console.error('Error saving module:', err);
-      
+      console.error("Error saving module:", err);
+
       // Extract detailed error information
-      const axiosError = err as { 
-        response?: { 
+      const axiosError = err as {
+        response?: {
           data?: { message?: string; error?: string };
           status?: number;
           statusText?: string;
@@ -363,45 +447,50 @@ const LecturerDashboard: React.FC = () => {
         message?: string;
       };
 
-      let errorMessage = 'Failed to save module';
+      let errorMessage = "Failed to save module";
 
       if (axiosError.response) {
         // Server responded with error
         const status = axiosError.response.status;
         const data = axiosError.response.data;
-        
-        errorMessage = data?.message || data?.error || axiosError.response.statusText || errorMessage;
-        
-        console.error('Server error response:', {
+
+        errorMessage =
+          data?.message ||
+          data?.error ||
+          axiosError.response.statusText ||
+          errorMessage;
+
+        console.error("Server error response:", {
           status,
           statusText: axiosError.response.statusText,
-          data: axiosError.response.data
+          data: axiosError.response.data,
         });
 
         // Add specific error context
         if (status === 400) {
-          if (errorMessage.includes('already exists')) {
+          if (errorMessage.includes("already exists")) {
             errorMessage = `Module code "${moduleForm.code}" already exists. Please use a different code.`;
-          } else if (errorMessage.includes('invalid student')) {
+          } else if (errorMessage.includes("invalid student")) {
             errorMessage = `Some selected students are invalid or no longer exist. Please refresh and reselect students.`;
-          } else if (errorMessage.includes('lecturer')) {
+          } else if (errorMessage.includes("lecturer")) {
             errorMessage = `Invalid lecturer assignment. ${errorMessage}`;
           }
         } else if (status === 401) {
-          errorMessage = 'Authentication failed. Please login again.';
+          errorMessage = "Authentication failed. Please login again.";
         } else if (status === 403) {
-          errorMessage = 'You do not have permission to perform this action.';
+          errorMessage = "You do not have permission to perform this action.";
         } else if (status === 500) {
           errorMessage = `Server error: ${errorMessage}. Please try again later.`;
         }
       } else if (axiosError.request) {
         // Request made but no response
-        errorMessage = 'No response from server. Please check your connection and try again.';
-        console.error('No response received:', axiosError.request);
+        errorMessage =
+          "No response from server. Please check your connection and try again.";
+        console.error("No response received:", axiosError.request);
       } else {
         // Error setting up request
         errorMessage = axiosError.message || errorMessage;
-        console.error('Request setup error:', axiosError.message);
+        console.error("Request setup error:", axiosError.message);
       }
 
       setError(errorMessage);
@@ -417,45 +506,50 @@ const LecturerDashboard: React.FC = () => {
       name: module.name,
       credits: module.credits,
       semester: module.semester,
-      description: ''
+      description: "",
     });
-    setSelectedStudentIds(module.studentList?.map(s => s._id) || []);
+    setSelectedStudentIds(module.students?.map((s) => s.id) || []);
     setShowModuleForm(true);
   };
 
   const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Are you sure you want to delete this module? This will also delete all associated lectures.')) return;
+    if (
+      !confirm(
+        "Are you sure you want to delete this module? This will also delete all associated lectures.",
+      )
+    )
+      return;
 
     try {
       await axios.delete(`${API_URL}/modules/${moduleId}`, {
-        withCredentials: true
+        withCredentials: true,
       });
-      setSuccess('Module deleted successfully!');
+      setSuccess("Module deleted successfully!");
       fetchModules();
     } catch (err: unknown) {
-      console.error('Error deleting module:', err);
+      console.error("Error deleting module:", err);
       const axiosError = err as { response?: { data?: { message?: string } } };
-      const errorMessage = axiosError.response?.data?.message || 'Failed to delete module';
+      const errorMessage =
+        axiosError.response?.data?.message || "Failed to delete module";
       setError(errorMessage);
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   return (
     <div className="min-h-screen bg-gray-100">
+      {selectedLiveLecture && (
+        <LiveAttendanceMonitor
+          lectureId={selectedLiveLecture.id}
+          lectureTitle={selectedLiveLecture.title}
+          onClose={() => setSelectedLiveLecture(null)}
+        />
+      )}
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Lecturer Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Lecturer Dashboard
+          </h1>
         </div>
       </div>
 
@@ -465,32 +559,29 @@ const LecturerDashboard: React.FC = () => {
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
               <button
-                onClick={() => setActiveTab('lectures')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'lectures'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                onClick={() => setActiveTab("lectures")}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${activeTab === "lectures"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
               >
                 Lectures
               </button>
               <button
-                onClick={() => setActiveTab('modules')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'modules'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                onClick={() => setActiveTab("modules")}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${activeTab === "modules"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
               >
                 My Modules
               </button>
               <button
-                onClick={() => setActiveTab('students')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 ${
-                  activeTab === 'students'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                onClick={() => setActiveTab("students")}
+                className={`px-6 py-4 text-sm font-medium border-b-2 ${activeTab === "students"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  }`}
               >
                 Students
               </button>
@@ -510,170 +601,282 @@ const LecturerDashboard: React.FC = () => {
           )}
 
           {/* Lectures Tab */}
-          {activeTab === 'lectures' && (
+          {activeTab === "lectures" && (
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Manage Lectures</h2>
-                <button
-                  onClick={() => {
-                    setShowLectureForm(true);
-                    setEditingLecture(null);
-                    setLectureForm({
-                      moduleId: '',
-                      startTime: '',
-                      endTime: '',
-                      location: '',
-                      type: 'Lecture',
-                      description: ''
-                    });
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  Create New Lecture
-                </button>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Manage Lectures
+                </h2>
+                <Dialog open={showLectureForm} onOpenChange={setShowLectureForm}>
+                  <DialogTrigger asChild>
+                    <Button
+                      onClick={() => {
+                        setEditingLecture(null);
+                        setLectureForm({
+                          moduleId: "",
+                          title: "",
+                          scheduledDate: "",
+                          scheduledTime: "",
+                          duration: 2,
+                          location: "",
+                          description: "",
+                          type: "LECTURE",
+                          status: "SCHEDULED",
+                        });
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Create New Lecture
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingLecture ? "Edit Lecture" : "Create New Lecture"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {editingLecture ? "Update lecture details below" : "Fill in the details to create a new lecture"}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {/* Lecture Form */}
+                    <form
+                      onSubmit={handleCreateLecture}
+                      className=" p-6 "
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Module *
+                          </label>
+                          <select
+                            name="moduleId"
+                            value={lectureForm.moduleId}
+                            onChange={handleLectureFormChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          >
+                            <option value="">Select Module</option>
+                            {modules.map((module) => (
+                              <option key={module.id} value={module.id}>
+                                {module.code} - {module.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Title *
+                          </label>
+                          <input
+                            type="text"
+                            name="title"
+                            value={lectureForm.title}
+                            onChange={handleLectureFormChange}
+                            placeholder="e.g., Introduction to Variables"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Date *
+                          </label>
+                          <input
+                            type="date"
+                            name="scheduledDate"
+                            value={lectureForm.scheduledDate}
+                            onChange={handleLectureFormChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Time *
+                          </label>
+                          <input
+                            type="time"
+                            name="scheduledTime"
+                            value={lectureForm.scheduledTime}
+                            onChange={handleLectureFormChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Duration (hours) *
+                          </label>
+                          <input
+                            type="number"
+                            name="duration"
+                            value={lectureForm.duration}
+                            onChange={handleLectureFormChange}
+                            min="1"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Location
+                          </label>
+                          <input
+                            type="text"
+                            name="location"
+                            value={lectureForm.location}
+                            onChange={handleLectureFormChange}
+                            placeholder="e.g., Hall A, Lab 3"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Description
+                          </label>
+                          <textarea
+                            name="description"
+                            value={lectureForm.description}
+                            onChange={handleLectureFormChange}
+                            rows={3}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Type
+                          </label>
+                          <select
+                            name="type"
+                            value={lectureForm.type}
+                            onChange={handleLectureFormChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="LECTURE">Lecture</option>
+                            <option value="LAB">Lab</option>
+                            <option value="TUTORIAL">Tutorial</option>
+                            <option value="OTHER">Other</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 mt-6">
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                        >
+                          {loading && <Loader className="w-4 h-4 animate-spin" />}
+                          {loading
+                            ? "Saving..."
+                            : editingLecture
+                              ? "Update Lecture"
+                              : "Create Lecture"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowLectureForm(false);
+                            setEditingLecture(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
 
-              {/* Lecture Form */}
-              {showLectureForm && (
-                <form onSubmit={handleCreateLecture} className="bg-gray-50 p-6 rounded-lg mb-6">
-                  <h3 className="text-xl font-semibold mb-4">
-                    {editingLecture ? 'Edit Lecture' : 'Create New Lecture'}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Module *</label>
-                      <select
-                        name="moduleId"
-                        value={lectureForm.moduleId}
-                        onChange={handleLectureFormChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      >
-                        <option value="">Select Module</option>
-                        {modules.map(module => (
-                          <option key={module._id} value={module._id}>
-                            {module.code} - {module.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                      <select
-                        name="type"
-                        value={lectureForm.type}
-                        onChange={handleLectureFormChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option>Lecture</option>
-                        <option>Lab</option>
-                        <option>Tutorial</option>
-                        <option>Workshop</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Start Time *</label>
-                      <input
-                        type="datetime-local"
-                        name="startTime"
-                        value={lectureForm.startTime}
-                        onChange={handleLectureFormChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">End Time *</label>
-                      <input
-                        type="datetime-local"
-                        name="endTime"
-                        value={lectureForm.endTime}
-                        onChange={handleLectureFormChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Location *</label>
-                      <input
-                        type="text"
-                        name="location"
-                        value={lectureForm.location}
-                        onChange={handleLectureFormChange}
-                        placeholder="e.g., Hall A, Lab 3"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                      <textarea
-                        name="description"
-                        value={lectureForm.description}
-                        onChange={handleLectureFormChange}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-4 mt-4">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
-                    >
-                      {loading ? 'Saving...' : editingLecture ? 'Update Lecture' : 'Create Lecture'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowLectureForm(false);
-                        setEditingLecture(null);
-                      }}
-                      className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
-
               {/* Lectures List */}
-              <div className="space-y-4">
+              <div className="flex w-full justify-center items-start gap-5 flex-wrap">
                 {lectures.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No lectures found. Create one to get started!</p>
+                  <p className="text-gray-500 text-center py-8">
+                    No lectures found. Create one to get started!
+                  </p>
                 ) : (
-                  lectures.map(lecture => (
-                    <div key={lecture._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                  lectures.map((lecture) => (
+                    <div
+                      key={lecture.id}
+                      className="w-full max-w-sm border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-lg transition"
+                    >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <h3 className="text-lg font-semibold text-gray-800">
-                            {lecture.moduleId?.code} - {lecture.type}
+                            {lecture.title}
                           </h3>
-                          <p className="text-sm text-gray-600 mt-1">{lecture.moduleId?.name}</p>
-                          <div className="mt-2 space-y-1 text-sm text-gray-700">
-                            <p>📅 {formatDateTime(lecture.startTime)} - {new Date(lecture.endTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
-                            <p>📍 {lecture.location}</p>
-                            {lecture.description && <p>📝 {lecture.description}</p>}
+                          <p className="text-sm text-gray-600 mt-1">
+                            {lecture.module?.code} - {lecture.module?.name}
+                          </p>
+
+                          <div className="mt-3 space-y-2 text-sm text-gray-700">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-gray-500" />
+                              {new Date(
+                                lecture.scheduledDate,
+                              ).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}{" "}
+                              • {lecture.scheduledTime} ({lecture.duration}{" "}
+                              min)
+                            </div>
+                            {lecture.location && (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-gray-500" />
+                                {lecture.location}
+                              </div>
+                            )}
+                            {lecture.description && (
+                              <p className="flex gap-1">
+                                <span className="text-gray-500">📝</span>{" "}
+                                {lecture.description}
+                              </p>
+                            )}
                           </div>
-                          <div className="mt-2 flex gap-2">
-                            {lecture.isCompleted && <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">Completed</span>}
-                            {lecture.isCancelled && <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded">Cancelled</span>}
+
+                          <div className="mt-3 flex gap-2">
+                            {lecture.status === "COMPLETED" && (
+                              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-md">
+                                Completed
+                              </span>
+                            )}
+                            {lecture.status === "CANCELLED" && (
+                              <span className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-md">
+                                Cancelled
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="flex gap-2">
-                          <button
+
+                        <div className="flex flex-col gap-2 ml-3">
+                          <Button
+                            size="icon"
+                            variant="outline"
                             onClick={() => handleEditLecture(lecture)}
-                            className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 transition text-sm"
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+                            title="Edit Lecture"
                           >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteLecture(lecture._id)}
-                            className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition text-sm"
+                            <SquarePen className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => setSelectedLiveLecture({ id: lecture.id, title: lecture.title })}
+                            className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
+                            title="Live Attendance Mode"
                           >
-                            Delete
-                          </button>
+                            <UsersRound className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            onClick={() => handleDeleteLecture(lecture.id)}
+                            title="Delete Lecture"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -684,150 +887,208 @@ const LecturerDashboard: React.FC = () => {
           )}
 
           {/* Modules Tab */}
-          {activeTab === 'modules' && (
+          {activeTab === "modules" && (
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">My Modules</h2>
-                <button
-                  onClick={() => {
-                    setShowModuleForm(true);
-                    setEditingModule(null);
-                    setModuleForm({ code: '', name: '', credits: 3, semester: '1', description: '' });
-                    setSelectedStudentIds([]);
-                  }}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  Create New Module
-                </button>
-              </div>
 
-              {/* Module Form */}
-              {showModuleForm && (
-                <form onSubmit={handleCreateModule} className="bg-gray-50 p-6 rounded-lg mb-6">
-                  <h3 className="text-xl font-semibold mb-4">
-                    {editingModule ? 'Edit Module' : 'Create New Module'}
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Module Code *</label>
-                      <input
-                        type="text"
-                        name="code"
-                        value={moduleForm.code}
-                        onChange={handleModuleFormChange}
-                        placeholder="e.g., CS1001"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Module Name *</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={moduleForm.name}
-                        onChange={handleModuleFormChange}
-                        placeholder="e.g., Introduction to Programming"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Credits</label>
-                      <input
-                        type="number"
-                        name="credits"
-                        value={moduleForm.credits}
-                        onChange={handleModuleFormChange}
-                        min="1"
-                        max="10"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Semester</label>
-                      <select
-                        name="semester"
-                        value={moduleForm.semester}
-                        onChange={handleModuleFormChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
-                          <option key={sem} value={sem}>{sem}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                      <textarea
-                        name="description"
-                        value={moduleForm.description}
-                        onChange={handleModuleFormChange}
-                        rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Student Selection */}
-                  <div className="mt-6">
-                    <StudentPicker
-                      selectedStudents={selectedStudentIds}
-                      onStudentsChange={setSelectedStudentIds}
-                    />
-                  </div>
-
-                  <div className="flex gap-4 mt-4">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
-                    >
-                      {loading ? 'Saving...' : editingModule ? 'Update Module' : 'Create Module'}
-                    </button>
-                    <button
-                      type="button"
+                <Dialog open={showModuleForm} onOpenChange={setShowModuleForm}>
+                  <DialogTrigger asChild>
+                    <Button
                       onClick={() => {
-                        setShowModuleForm(false);
                         setEditingModule(null);
+                        setModuleForm({
+                          code: "",
+                          name: "",
+                          credits: 3,
+                          semester: "1",
+                          description: "",
+                        });
+                        setSelectedStudentIds([]);
                       }}
-                      className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400 transition"
                     >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              )}
+                      <Plus className="w-4 h-4" />
+                      Create New Module
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingModule ? "Edit Module" : "Create New Module"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {editingModule ? "Update module details and student enrollment" : "Fill in the details to create a new module and enroll students"}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateModule} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Module Code *
+                          </label>
+                          <input
+                            type="text"
+                            name="code"
+                            value={moduleForm.code}
+                            onChange={handleModuleFormChange}
+                            placeholder="e.g., CS1001"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Module Name *
+                          </label>
+                          <input
+                            type="text"
+                            name="name"
+                            value={moduleForm.name}
+                            onChange={handleModuleFormChange}
+                            placeholder="e.g., Introduction to Programming"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Credits
+                          </label>
+                          <input
+                            type="number"
+                            name="credits"
+                            value={moduleForm.credits}
+                            onChange={handleModuleFormChange}
+                            min="1"
+                            max="10"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Semester
+                          </label>
+                          <select
+                            name="semester"
+                            value={moduleForm.semester}
+                            onChange={handleModuleFormChange}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                              <option key={sem} value={sem}>
+                                {sem}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Description
+                          </label>
+                          <textarea
+                            name="description"
+                            value={moduleForm.description}
+                            onChange={handleModuleFormChange}
+                            rows={3}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
 
+                      <div>
+                        <StudentPicker
+                          selectedStudents={selectedStudentIds}
+                          onStudentsChange={setSelectedStudentIds}
+                        />
+                      </div>
+
+                      <div className="flex gap-4">
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                        >
+                          {loading && <Loader className="w-4 h-4 animate-spin" />}
+                          {loading
+                            ? "Saving..."
+                            : editingModule
+                              ? "Update Module"
+                              : "Create Module"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowModuleForm(false);
+                            setEditingModule(null);
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
               {/* Modules Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {modules.length === 0 ? (
-                  <p className="text-gray-500 col-span-full text-center py-8">No modules assigned yet. Create one to get started!</p>
+                  <p className="text-gray-500 col-span-full text-center py-8">
+                    No modules assigned yet. Create one to get started!
+                  </p>
                 ) : (
-                  modules.map(module => (
-                    <div key={module._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-lg font-bold text-gray-800">{module.code}</h3>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleEditModule(module)}
-                            className="bg-yellow-500 text-white px-2 py-1 rounded hover:bg-yellow-600 transition text-xs"
+                  modules.map((module) => (
+                    <div
+                      key={module.id}
+                      className="border border-gray-200 rounded-lg p-5 hover:shadow-lg transition bg-white cursor-pointer"
+                      onClick={() => handleEditModule(module)}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-lg font-bold text-gray-900">
+                              {module.code}
+                            </h3>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Sem {module.semester}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 leading-snug">
+                            {module.name}
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5 ml-2">
+
+                          <Button
+                            size="icon"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteModule(module.id);
+                            }}
+                            title="Delete Module"
                           >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteModule(module._id)}
-                            className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition text-xs"
-                          >
-                            Delete
-                          </button>
+                            <Trash className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">{module.name}</p>
-                      <div className="mt-3 space-y-1 text-sm text-gray-700">
-                        <p>📚 Credits: {module.credits}</p>
-                        <p>📅 Semester: {module.semester}</p>
-                        <p>👥 Students: {module.studentList?.length || 0}</p>
+
+                      <div className="mt-4 pt-3 border-t border-gray-100">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="flex gap-2 items-center justify-center text-gray-500"><BookmarkCheck className="w-4 h-4" /> Credits:</span>
+                            <span className="font-semibold text-gray-900">
+                              {module.credits}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="flex gap-2 items-center justify-center text-gray-500"><UsersRound className="w-4 h-4" /> Students:</span>
+                            <span
+                              className={`font-bold ${(module.students?.length || 0) > 0 ? "text-green-600" : "text-gray-400"}`}
+                            >
+                              {module.students?.length || 0}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -837,42 +1098,48 @@ const LecturerDashboard: React.FC = () => {
           )}
 
           {/* Students Tab */}
-          {activeTab === 'students' && (
+          {activeTab === "students" && (
             <div className="p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Student List</h2>
-              
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">
+                Student List
+              </h2>
+
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Module</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Module
+                  </label>
                   <select
                     value={selectedModule}
                     onChange={(e) => {
                       setSelectedModule(e.target.value);
-                      setSelectedBatch('');
+                      setSelectedBatch("");
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Module</option>
-                    {modules.map(module => (
-                      <option key={module._id} value={module._id}>
+                    {modules.map((module) => (
+                      <option key={module.id} value={module.id}>
                         {module.code} - {module.name}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Batch</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Batch
+                  </label>
                   <select
                     value={selectedBatch}
                     onChange={(e) => {
                       setSelectedBatch(e.target.value);
-                      setSelectedModule('');
+                      setSelectedModule("");
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Batch</option>
-                    {batches.map(batch => (
+                    {batches.map((batch) => (
                       <option key={batch} value={batch}>
                         Batch {batch}
                       </option>
@@ -883,27 +1150,52 @@ const LecturerDashboard: React.FC = () => {
 
               {/* Students Table */}
               {filteredStudents.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No students found. Select a module or batch to view students.</p>
+                <p className="text-gray-500 text-center py-8">
+                  No students found. Select a module or batch to view students.
+                </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full bg-white border border-gray-200">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Index Number</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Batch</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Degree</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                          Index Number
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                          Name
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                          Email
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                          Batch
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                          Degree
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredStudents.map(student => (
-                        <tr key={student._id} className="border-t border-gray-200 hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-800">{student.indexNumber}</td>
-                          <td className="px-4 py-3 text-sm text-gray-800">{student.name}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{student.email}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{student.batch}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{student.degree}</td>
+                      {filteredStudents.map((student) => (
+                        <tr
+                          key={student.id}
+                          className="border-t border-gray-200 hover:bg-gray-50"
+                        >
+                          <td className="px-4 py-3 text-sm text-gray-800">
+                            {student.index_number}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-800">
+                            {student.name}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {student.email}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {student.batch}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {student.degree}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

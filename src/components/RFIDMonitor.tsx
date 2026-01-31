@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
@@ -16,7 +16,7 @@ interface User {
   email: string;
 }
 
-export default function RFIDMonitor() {
+const RFIDMonitor: FC = () => {
   const [rfids, setRfids] = useState<RFIDEntry[]>([]);
   const [connected, setConnected] = useState(false);
   const [user] = useState<User | null>(() => {
@@ -217,3 +217,5 @@ export default function RFIDMonitor() {
     </div>
   );
 }
+
+export default RFIDMonitor;

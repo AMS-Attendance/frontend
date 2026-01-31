@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api';
 
 interface Module {
-  _id: string;
+  id: string;
   code: string;
   name: string;
   credits: number;
 }
 
 interface AttendanceRecord {
-  _id: string;
-  lectureId: {
-    _id: string;
-    moduleId: Module;
-    startTime: string;
+  id: string;
+  lecture_id: {
+    id: string;
+    module_id: Module;
+    start_time: string;
     location: string;
     type: string;
   };
@@ -26,14 +26,14 @@ interface AttendanceRecord {
 
 interface ModuleSummary {
   module: Module;
-  totalLectures: number;
-  attendedLectures: number;
+  total_lectures: number;
+  attended_lectures: number;
   percentage: number;
-  meets80Percent: boolean;
+  meets_80_percent: boolean;
   status: string;
 }
 
-const StudentDashboard: React.FC = () => {
+const StudentDashboard: FC = () => {
   const [activeTab, setActiveTab] = useState<'summary' | 'records'>('summary');
   const [summary, setSummary] = useState<ModuleSummary[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -62,7 +62,7 @@ const StudentDashboard: React.FC = () => {
 
     if (selectedModule) {
       filtered = filtered.filter(
-        record => record.lectureId?.moduleId?._id === selectedModule
+        record => record.lecture_id?.module_id?.id === selectedModule
       );
     }
 
@@ -143,7 +143,7 @@ const StudentDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-white">Student Attendance Dashboard</h1>
           <p className="text-indigo-100 mt-1">
-            Welcome back, {user?.name} • {user?.indexNumber}
+            Welcome back, {user?.name} • {user?.index_number}
           </p>
         </div>
       </div>
@@ -210,9 +210,9 @@ const StudentDashboard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {summary.map((moduleSummary) => (
                     <div
-                      key={moduleSummary.module._id}
+                      key={moduleSummary.module.id}
                       className={`border-2 rounded-lg p-6 transition-all hover:shadow-lg ${
-                        moduleSummary.meets80Percent
+                        moduleSummary.meets_80_percent
                           ? 'border-green-300 bg-green-50'
                           : 'border-red-300 bg-red-50'
                       }`}
@@ -228,12 +228,12 @@ const StudentDashboard: React.FC = () => {
                         </div>
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            moduleSummary.meets80Percent
+                            moduleSummary.meets_80_percent
                               ? 'bg-green-500 text-white'
                               : 'bg-red-500 text-white'
                           }`}
                         >
-                          {moduleSummary.meets80Percent ? '✓ Pass' : '✗ Below 80%'}
+                          {moduleSummary.meets_80_percent ? '✓ Pass' : '✗ Below 80%'}
                         </span>
                       </div>
 
@@ -263,7 +263,7 @@ const StudentDashboard: React.FC = () => {
                           <div className="flex justify-between">
                             <span className="text-gray-600">Attended:</span>
                             <span className="font-semibold text-gray-800">
-                              {moduleSummary.attendedLectures} / {moduleSummary.totalLectures}
+                              {moduleSummary.attended_lectures} / {moduleSummary.total_lectures}
                             </span>
                           </div>
                           <div className="flex justify-between">
@@ -276,7 +276,7 @@ const StudentDashboard: React.FC = () => {
                             <span className="text-gray-600">Status:</span>
                             <span
                               className={`font-semibold ${
-                                moduleSummary.meets80Percent ? 'text-green-700' : 'text-red-700'
+                                moduleSummary.meets_80_percent ? 'text-green-700' : 'text-red-700'
                               }`}
                             >
                               {moduleSummary.status}
@@ -285,7 +285,7 @@ const StudentDashboard: React.FC = () => {
                         </div>
 
                         {/* Warning */}
-                        {!moduleSummary.meets80Percent && (
+                        {!moduleSummary.meets_80_percent && (
                           <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded text-xs text-red-800">
                             ⚠️ Warning: Below 80% attendance requirement
                           </div>
@@ -316,7 +316,7 @@ const StudentDashboard: React.FC = () => {
                     >
                       <option value="">All Modules</option>
                       {summary.map((s) => (
-                        <option key={s.module._id} value={s.module._id}>
+                        <option key={s.module.id} value={s.module.id}>
                           {s.module.code} - {s.module.name}
                         </option>
                       ))}
@@ -375,26 +375,26 @@ const StudentDashboard: React.FC = () => {
                     </thead>
                     <tbody>
                       {filteredRecords.map((record) => (
-                        <tr key={record._id} className="border-t border-gray-200 hover:bg-gray-50">
+                        <tr key={record.id} className="border-t border-gray-200 hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm text-gray-800">
-                            {formatDateTime(record.lectureId?.startTime)}
+                            {formatDateTime(record.lecture_id?.start_time)}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <div>
                               <span className="font-semibold text-gray-800">
-                                {record.lectureId?.moduleId?.code}
+                                {record.lecture_id?.module_id?.code}
                               </span>
                               <br />
                               <span className="text-xs text-gray-500">
-                                {record.lectureId?.moduleId?.name}
+                                {record.lecture_id?.module_id?.name}
                               </span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700">
-                            {record.lectureId?.type}
+                            {record.lecture_id?.type}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700">
-                            {record.lectureId?.location}
+                            {record.lecture_id?.location}
                           </td>
                           <td className="px-4 py-3">
                             <span

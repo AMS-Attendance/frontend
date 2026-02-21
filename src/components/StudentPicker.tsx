@@ -21,7 +21,7 @@ const StudentPicker: FC<StudentPickerProps> = ({ selectedStudents, onStudentsCha
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(false);
-  
+
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [batchFilter, setBatchFilter] = useState('');
@@ -30,7 +30,7 @@ const StudentPicker: FC<StudentPickerProps> = ({ selectedStudents, onStudentsCha
   const [availableDegrees, setAvailableDegrees] = useState<string[]>([]);
 
   // Selection mode
-  const [selectMode, setSelectMode] = useState<'individual' | 'batch' | 'degree'>('individual');
+
 
   useEffect(() => {
     fetchAllStudents();
@@ -68,7 +68,7 @@ const StudentPicker: FC<StudentPickerProps> = ({ selectedStudents, onStudentsCha
       });
       const studentData = response.data.data || [];
       setStudents(studentData);
-      
+
       // Extract unique batches and degrees
       const batches = [...new Set(studentData.map((s: Student) => s.batch).filter(Boolean))] as string[];
       const degrees = [...new Set(studentData.map((s: Student) => s.degree).filter(Boolean))] as string[];
@@ -99,15 +99,7 @@ const StudentPicker: FC<StudentPickerProps> = ({ selectedStudents, onStudentsCha
     onStudentsChange(selectedStudents.filter(id => !filteredIds.includes(id)));
   };
 
-  const handleSelectByBatch = (batch: string) => {
-    const batchStudents = students.filter(s => s.batch === parseInt(batch)).map(s => s.id);
-    onStudentsChange([...new Set([...selectedStudents, ...batchStudents])]);
-  };
 
-  const handleSelectByDegree = (degree: string) => {
-    const degreeStudents = students.filter(s => s.degree === degree).map(s => s.id);
-    onStudentsChange([...new Set([...selectedStudents, ...degreeStudents])]);
-  };
 
   const handleClearAll = () => {
     onStudentsChange([]);
@@ -219,71 +211,71 @@ const StudentPicker: FC<StudentPickerProps> = ({ selectedStudents, onStudentsCha
       )} */}
 
       {/* Filters */}
-      {selectMode === 'individual' && (
-        <div className="space-y-3 mb-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Name, email, or index..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Batch</label>
-              <select
-                value={batchFilter}
-                onChange={(e) => setBatchFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Batches</option>
-                {availableBatches.map(batch => (
-                  <option key={batch} value={batch}>
-                    Batch {batch}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Degree</label>
-              <select
-                value={degreeFilter}
-                onChange={(e) => setDegreeFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Degrees</option>
-                {availableDegrees.map(degree => (
-                  <option key={degree} value={degree}>
-                    {degree}
-                  </option>
-                ))}
-              </select>
-            </div>
+
+      <div className="space-y-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Name, email, or index..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-          
-          {(searchQuery || batchFilter || degreeFilter) && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <span>Showing {filteredStudents.length} of {students.length} students</span>
-              {(searchQuery || batchFilter || degreeFilter) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setBatchFilter('');
-                    setDegreeFilter('');
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Batch</label>
+            <select
+              value={batchFilter}
+              onChange={(e) => setBatchFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Batches</option>
+              {availableBatches.map(batch => (
+                <option key={batch} value={batch}>
+                  Batch {batch}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Degree</label>
+            <select
+              value={degreeFilter}
+              onChange={(e) => setDegreeFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Degrees</option>
+              {availableDegrees.map(degree => (
+                <option key={degree} value={degree}>
+                  {degree}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      )}
+
+        {(searchQuery || batchFilter || degreeFilter) && (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Showing {filteredStudents.length} of {students.length} students</span>
+            {(searchQuery || batchFilter || degreeFilter) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setBatchFilter('');
+                  setDegreeFilter('');
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
 
       {/* Bulk Actions */}
       <div className="flex flex-wrap gap-2 mb-3">
@@ -354,9 +346,9 @@ const StudentPicker: FC<StudentPickerProps> = ({ selectedStudents, onStudentsCha
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-indigo-900">
-              {getSelectedCount() === 0 ? 'No students selected' : 
-               getSelectedCount() === 1 ? '1 student will be enrolled' : 
-               `${getSelectedCount()} students will be enrolled`}
+              {getSelectedCount() === 0 ? 'No students selected' :
+                getSelectedCount() === 1 ? '1 student will be enrolled' :
+                  `${getSelectedCount()} students will be enrolled`}
             </p>
             {getSelectedCount() > 0 && filteredStudents.length > 0 && getFilteredSelectedCount() > 0 && (
               <p className="text-xs text-indigo-600 mt-1">

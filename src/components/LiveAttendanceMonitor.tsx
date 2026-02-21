@@ -25,7 +25,7 @@ interface AttendanceRecord {
 }
 
 const LiveAttendanceMonitor: FC<LiveAttendanceMonitorProps> = ({ lectureId, lectureTitle, onClose }) => {
-    const [socket, setSocket] = useState<Socket | null>(null);
+    const [, setSocket] = useState<Socket | null>(null);
     const [connected, setConnected] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);

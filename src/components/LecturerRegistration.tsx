@@ -49,7 +49,7 @@ const LecturerRegistration: FC = () => {
     try {
       setLoading(true);
       
-      const response = await axios.post(
+      await axios.post(
         `${API_URL}/users`,
         {
           name: formData.name,

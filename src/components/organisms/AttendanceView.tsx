@@ -23,17 +23,14 @@ const AttendanceView: FC<AttendanceViewProps> = ({ lectureId, studentId }) => {
     try {
       setLoading(true);
       setError('');
-      
+
       if (lectureId) {
-        const data = await attendanceApi.getLectureAttendance(lectureId);
+        const data = await attendanceApi.getAllAttendance({ lectureId });
         setAttendance(data.data);
       } else if (studentId) {
-        const [data, statsData] = await Promise.all([
-          attendanceApi.getStudentAttendance(studentId),
-          attendanceApi.getStudentStats(studentId),
-        ]);
+        const data = await attendanceApi.getStudentAttendance(studentId);
         setAttendance(data.data);
-        setStats(statsData.data);
+        setStats(data.stats);
       } else {
         const data = await attendanceApi.getAllAttendance();
         setAttendance(data.data);
@@ -160,8 +157,8 @@ const AttendanceView: FC<AttendanceViewProps> = ({ lectureId, studentId }) => {
                           record.status === 'present'
                             ? 'success'
                             : record.status === 'late'
-                            ? 'warning'
-                            : 'error'
+                              ? 'warning'
+                              : 'error'
                         }
                       >
                         {record.status}

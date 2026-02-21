@@ -249,6 +249,22 @@ export const attendanceApi = {
     const { data } = await api.delete<ApiResponse<void>>(`/attendance/${id}`);
     return data;
   },
+
+  // ========== Session Management (for ESP32 HTTP mode) ==========
+  getSession: async () => {
+    const { data } = await api.get<ApiResponse<{ lectureId: string; lecturerId: string; startedAt: string } | null>>('/attendance/session');
+    return data;
+  },
+
+  startSession: async (lectureId: string) => {
+    const { data } = await api.post<ApiResponse<{ lectureId: string; lecturerId: string; startedAt: string }>>('/attendance/session/start', { lectureId });
+    return data;
+  },
+
+  endSession: async () => {
+    const { data } = await api.post<ApiResponse<{ lectureId: string; lecturerId: string; startedAt: string }>>('/attendance/session/end', {});
+    return data;
+  },
 };
 
 export default api;

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+// Strip /api suffix so Socket.IO connects to the server root
+const SOCKET_URL = (import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api').replace(/\/api$/, '');
 
 interface RFIDEntry {
   rfid: string;
@@ -35,7 +36,7 @@ const RFIDMonitor: FC = () => {
     console.log('🔌 Initializing Socket.IO connection...');
 
     // Setup Socket.IO connection
-    const socket: Socket = io(API_URL, {
+    const socket: Socket = io(SOCKET_URL, {
       transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 2000,

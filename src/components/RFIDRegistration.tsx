@@ -17,8 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Input, Alert } from './atoms';
 import StudentRegistrationForm from './StudentRegistrationForm';
 
-const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api';
-const SOCKET_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_BASE_URL;
+const SOCKET_URL = import.meta.env.VITE_BASE_URL;
 
 interface Student {
   id: string;

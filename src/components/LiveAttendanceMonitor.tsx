@@ -4,8 +4,8 @@ import axios from 'axios';
 import { X, Wifi, UserCheck, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-const API_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:8000/api';
-const SOCKET_URL = 'http://localhost:8000'; // Adjust if different from API_URL
+const API_URL = import.meta.env.VITE_BASE_URL 
+const SOCKET_URL = import.meta.env.VITE_BASE_URL; 
 
 interface LiveAttendanceMonitorProps {
     lectureId: string;
